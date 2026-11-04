@@ -1,542 +1,182 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Slither Snack</title>
-    <style>
-      :root {
-        --bg1: #0a1220;
-        --bg2: #091521;
-        --hud: rgba(14, 18, 24, 0.52);
-        --panel: rgba(17, 23, 35, 0.9);
-        --line: rgba(255,255,255,0.12);
-        --green: #65f0a8;
-        --green-dark: #2abb78;
-        --green-soft: #d7ffe9;
-        --red: #ff5872;
-        --red-soft: #ffb2be;
-        --text: #edf6ff;
-        --muted: #b8c7d8;
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101b2c">
+  <title>Slither Snack</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow: hidden; color: #f5f7fb; background: #101b2c; font-family: system-ui, sans-serif; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .hud { position: fixed; z-index: 2; top: max(20px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; gap: 12px; pointer-events: none; }
+    .pill { min-width: 100px; padding: 10px 16px; border: 1px solid #ffffff20; border-radius: 16px; background: #101b2ccc; text-align: center; backdrop-filter: blur(10px); }
+    .pill small { display: block; color: #aab8ca; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .pill strong { display: block; margin-top: 2px; font-size: 22px; }
+    .hint { position: fixed; z-index: 2; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); color: #d3deeb; font-size: 12px; text-shadow: 0 2px 6px #000; white-space: nowrap; pointer-events: none; }
+    .overlay { position: fixed; z-index: 3; inset: 0; display: grid; place-items: center; padding: 24px; background: #09111c88; backdrop-filter: blur(5px); }
+    .overlay.hidden { display: none; }
+    .card { width: min(420px, 100%); padding: 34px 30px; border: 1px solid #ffffff20; border-radius: 28px; background: linear-gradient(145deg, #1d2b40f5, #111b2bf5); box-shadow: 0 24px 80px #0008; text-align: center; }
+    .emoji { font-size: 42px; } h1 { margin: 10px 0 8px; font-size: clamp(30px, 8vw, 42px); letter-spacing: -.04em; }
+    p { margin: 0 auto 24px; max-width: 310px; color: #b6c2d2; line-height: 1.6; }
+    button { border: 0; border-radius: 14px; padding: 13px 28px; color: #102018; background: #82ed9e; font: inherit; font-weight: 850; cursor: pointer; }
+    button:hover { background: #a0f5b5; }
+    @media (max-width: 520px) { .hint { font-size: 10px; } .pill { min-width: 88px; padding: 9px 12px; } }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Snake game. Steer with your pointer or arrow keys."></canvas>
+  <div class="hud" aria-live="polite"><div class="pill"><small>Apples</small><strong id="score">0</strong></div><div class="pill"><small>Best</small><strong id="best">0</strong></div></div>
+  <div class="hint">Move your pointer to steer · Arrow keys / WASD also work</div>
+  <div class="overlay" id="overlay"><section class="card"><div class="emoji">🐍</div><h1 id="title">Slither Snack</h1><p id="message">A smooth little snake, a field full of apples. Guide your snake around and see how long you can grow!</p><button id="start">Let's slither</button></section></div>
+<script>
+(() => {
+  const canvas = document.querySelector('#game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.querySelector('#score');
+  const bestEl = document.querySelector('#best');
+  const overlay = document.querySelector('#overlay');
+  const titleEl = document.querySelector('#title');
+  const messageEl = document.querySelector('#message');
+  const startButton = document.querySelector('#start');
+  const WORLD = { width: 2600, height: 1900 };
+  const APPLE_R = 9, SPACING = 10, BODY_GAP = 30;
+  let width = innerWidth, height = innerHeight, dpr = 1;
+  let running = false, lastTime = 0, score = 0;
+  let best = Number(localStorage.getItem('slitherSnackBest') || 0);
+  let snake, apples, heading, targetHeading;
+  let pointer = { x: width / 2, y: height / 2 }, keys = {};
+  bestEl.textContent = best;
+
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    width = innerWidth; height = innerHeight;
+    canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener('resize', resize); resize();
+  function reset() {
+    const x = WORLD.width / 2, y = WORLD.height / 2;
+    heading = targetHeading = -Math.PI / 2;
+    snake = { x, y, trail: [{ x, y, d: 0 }], distance: 0, length: 115, radius: 11 };
+    apples = [];
+    for (let i = 0; i < 32; i++) spawnApple();
+    score = 0; scoreEl.textContent = '0';
+  }
+  function spawnApple() {
+    apples.push({ x: 45 + Math.random() * (WORLD.width - 90), y: 45 + Math.random() * (WORLD.height - 90), phase: Math.random() * Math.PI * 2 });
+  }
+  function angleDiff(a, b) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+  function setPointer(e) { pointer = { x: e.clientX, y: e.clientY }; }
+  addEventListener('pointermove', setPointer);
+  addEventListener('pointerdown', setPointer);
+  addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) e.preventDefault();
+    keys[key] = true;
+    if (!running && (key === 'enter' || key === ' ')) startGame();
+  });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function pointAtDistance(back) {
+    const target = snake.distance - back;
+    // Trail is newest-first: distances decrease as we walk toward the tail.
+    for (let i = 0; i < snake.trail.length - 1; i++) {
+      const a = snake.trail[i], b = snake.trail[i + 1];
+      if (a.d >= target && b.d <= target) {
+        const t = (a.d - target) / Math.max(.001, a.d - b.d);
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
       }
+    }
+    return snake.trail[snake.trail.length - 1];
+  }
+  function update(dt) {
+    const horizontal = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+    const vertical = (keys.arrowdown || keys.s ? 1 : 0) - (keys.arrowup || keys.w ? 1 : 0);
+    if (horizontal || vertical) {
+      targetHeading = Math.atan2(vertical, horizontal);
+    } else {
+      const dx = pointer.x - width / 2, dy = pointer.y - height / 2;
+      if (Math.hypot(dx, dy) > 12) targetHeading = Math.atan2(dy, dx);
+    }
+    heading += Math.max(-3 * dt, Math.min(3 * dt, angleDiff(heading, targetHeading)));
+    const speed = 155 + Math.min(score, 30) * 1.2;
+    const oldX = snake.x, oldY = snake.y;
+    snake.x += Math.cos(heading) * speed * dt;
+    snake.y += Math.sin(heading) * speed * dt;
+    snake.distance += Math.hypot(snake.x - oldX, snake.y - oldY);
+    snake.trail.unshift({ x: snake.x, y: snake.y, d: snake.distance });
+    while (snake.trail.length > 2 && snake.distance - snake.trail[snake.trail.length - 1].d > snake.length + 80) snake.trail.pop();
+    if (snake.x < 22 || snake.y < 22 || snake.x > WORLD.width - 22 || snake.y > WORLD.height - 22) return endGame();
 
-      * { box-sizing: border-box; }
-      html, body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: radial-gradient(circle at top, #12253f 0%, var(--bg1) 35%, var(--bg2) 100%);
-        color: var(--text);
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    // Only check body segments that have actually been laid down, and leave a safe gap behind the head.
+    for (let back = BODY_GAP; back < Math.min(snake.length, snake.distance); back += 11) {
+      const p = pointAtDistance(back);
+      if (Math.hypot(p.x - snake.x, p.y - snake.y) < snake.radius * 1.45) return endGame();
+    }
+    for (let i = apples.length - 1; i >= 0; i--) {
+      const a = apples[i];
+      if (Math.hypot(a.x - snake.x, a.y - snake.y) < snake.radius + APPLE_R + 3) {
+        apples.splice(i, 1); spawnApple(); score++; snake.length += 14;
+        scoreEl.textContent = score;
       }
-
-      body { position: relative; }
-
-      canvas {
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        display: block;
-        touch-action: none;
-        cursor: crosshair;
-      }
-
-      .hud {
-        position: fixed;
-        top: max(18px, env(safe-area-inset-top));
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 12px;
-        z-index: 10;
-        pointer-events: none;
-      }
-
-      .chip {
-        min-width: 110px;
-        background: var(--hud);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 10px 14px;
-        text-align: center;
-        backdrop-filter: blur(8px);
-        box-shadow: 0 10px 22px rgba(0,0,0,0.18);
-      }
-
-      .chip small {
-        display: block;
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-weight: 700;
-      }
-
-      .chip strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 24px;
-        line-height: 1;
-      }
-
-      .hint {
-        position: fixed;
-        left: 50%;
-        bottom: max(18px, env(safe-area-inset-bottom));
-        transform: translateX(-50%);
-        font-size: 12px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: rgba(236,243,255,0.82);
-        z-index: 10;
-        pointer-events: none;
-        white-space: nowrap;
-      }
-
-      .overlay {
-        position: fixed;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        background: rgba(7, 12, 18, 0.45);
-        z-index: 30;
-        backdrop-filter: blur(6px);
-      }
-
-      .overlay.hidden { display: none; }
-
-      .card {
-        width: min(430px, calc(100vw - 28px));
-        background: linear-gradient(160deg, rgba(22, 37, 52, 0.96), rgba(12, 18, 29, 0.96));
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 28px;
-        box-shadow: 0 28px 90px rgba(0,0,0,0.45);
-        padding: 30px 26px 24px;
-        text-align: center;
-      }
-
-      .emoji {
-        font-size: clamp(38px, 9vw, 54px);
-        margin-bottom: 8px;
-      }
-
-      h1 {
-        margin: 0 0 10px;
-        font-size: clamp(30px, 7vw, 46px);
-        letter-spacing: -0.06em;
-      }
-
-      p {
-        margin: 0 auto 24px;
-        max-width: 300px;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-
-      button {
-        appearance: none;
-        border: none;
-        border-radius: 14px;
-        padding: 14px 24px;
-        background: linear-gradient(180deg, #78f7b5, #58df98);
-        color: #0d1f17;
-        font-size: 17px;
-        font-weight: 800;
-        letter-spacing: 0.02em;
-        cursor: pointer;
-        box-shadow: 0 10px 20px rgba(87, 219, 133, 0.3);
-        transition: transform 120ms ease, filter 120ms ease;
-      }
-
-      button:hover { transform: translateY(-2px); filter: brightness(1.03); }
-      button:active { transform: translateY(0); }
-
-      @media (max-width: 520px) {
-        .chip { min-width: 95px; padding: 9px 10px; }
-        .chip strong { font-size: 20px; }
-        .hint { letter-spacing: 0.04em; font-size: 10px; }
-      }
-    </style>
-  </head>
-  <body>
-    <canvas id="game" aria-label="Snake game"></canvas>
-
-    <div class="hud" aria-live="polite">
-      <div class="chip"><small>Apples</small><strong id="score">0</strong></div>
-      <div class="chip"><small>Best</small><strong id="best">0</strong></div>
-    </div>
-
-    <div class="hint">Move the mouse to steer • arrow keys / WASD also work</div>
-
-    <div class="overlay" id="overlay">
-      <div class="card">
-        <div class="emoji">🐍</div>
-        <h1 id="title">Slither Snack</h1>
-        <p id="message">A smooth, free-roaming snake. Chase apples, grow longer, and avoid your own tail.</p>
-        <button id="startBtn">Start game</button>
-      </div>
-    </div>
-
-    <script>
-      (() => {
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const bestEl = document.getElementById('best');
-        const overlay = document.getElementById('overlay');
-        const titleEl = document.getElementById('title');
-        const messageEl = document.getElementById('message');
-        const startBtn = document.getElementById('startBtn');
-
-        const WORLD = { width: 1900, height: 1200 };
-        const PLAYER_RADIUS = 12;
-        const APPLE_RADIUS = 10;
-        const MAX_APPLES = 28;
-
-        let width = window.innerWidth;
-        let height = window.innerHeight;
-        let dpr = Math.min(window.devicePixelRatio || 1, 2);
-        let score = 0;
-        let best = Number(localStorage.getItem('slitherSnackBest') || 0);
-        let running = false;
-        let lastTime = 0;
-        let pointer = { x: width * 0.5, y: height * 0.5 };
-        let targetHeading = -Math.PI / 2;
-        let heading = -Math.PI / 2;
-        let snake = null;
-        let apples = [];
-
-        bestEl.textContent = String(best);
-
-        function resize() {
-          dpr = Math.min(window.devicePixelRatio || 1, 2);
-          width = window.innerWidth;
-          height = window.innerHeight;
-          canvas.width = Math.round(width * dpr);
-          canvas.height = Math.round(height * dpr);
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-
-        window.addEventListener('resize', resize);
-        resize();
-
-        function clamp(value, min, max) {
-          return Math.min(max, Math.max(min, value));
-        }
-
-        function angleDiff(a, b) {
-          return Math.atan2(Math.sin(b - a), Math.cos(b - a));
-        }
-
-        function resetGame() {
-          heading = -Math.PI / 2;
-          targetHeading = heading;
-          snake = {
-            x: WORLD.width * 0.5,
-            y: WORLD.height * 0.5,
-            radius: PLAYER_RADIUS,
-            trail: [{ x: WORLD.width * 0.5, y: WORLD.height * 0.5, distance: 0 }],
-            currentDistance: 0,
-            length: 120,
-            speed: 180
-          };
-
-          apples = [];
-          while (apples.length < MAX_APPLES) spawnApple();
-          score = 0;
-          scoreEl.textContent = '0';
-        }
-
-        function spawnApple() {
-          apples.push({
-            x: 60 + Math.random() * (WORLD.width - 120),
-            y: 60 + Math.random() * (WORLD.height - 120),
-            phase: Math.random() * Math.PI * 2,
-            pulse: 0.7 + Math.random() * 1.6
-          });
-        }
-
-        function setPointerFromEvent(event) {
-          pointer.x = event.clientX;
-          pointer.y = event.clientY;
-          const dx = pointer.x - width * 0.5;
-          const dy = pointer.y - height * 0.5;
-          if (Math.hypot(dx, dy) > 6) {
-            targetHeading = Math.atan2(dy, dx);
-          }
-        }
-
-        canvas.addEventListener('pointermove', setPointerFromEvent);
-        canvas.addEventListener('pointerdown', setPointerFromEvent);
-
-        const keyState = {};
-
-        window.addEventListener('keydown', (event) => {
-          const key = event.key.toLowerCase();
-          if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) event.preventDefault();
-          keyState[key] = true;
-
-          if (!running && (key === 'enter' || key === ' ')) {
-            startGame();
-          }
-        });
-
-        window.addEventListener('keyup', (event) => {
-          keyState[event.key.toLowerCase()] = false;
-        });
-
-        function updateHeading() {
-          const controlX = (keyState.d || keyState.arrowright ? 1 : 0) - (keyState.a || keyState.arrowleft ? 1 : 0);
-          const controlY = (keyState.s || keyState.arrowdown ? 1 : 0) - (keyState.w || keyState.arrowup ? 1 : 0);
-
-          if (controlX !== 0 || controlY !== 0) {
-            targetHeading = Math.atan2(controlY, controlX);
-          }
-
-          const dx = pointer.x - width * 0.5;
-          const dy = pointer.y - height * 0.5;
-          if (Math.hypot(dx, dy) > 8) {
-            targetHeading = Math.atan2(dy, dx);
-          }
-
-          const maxTurn = 1.75;
-          const diff = angleDiff(heading, targetHeading);
-          heading += clamp(diff, -maxTurn, maxTurn);
-        }
-
-        function getPointAtDistance(distance) {
-          if (!snake) return { x: WORLD.width * 0.5, y: WORLD.height * 0.5 };
-
-          for (let i = 0; i < snake.trail.length - 1; i++) {
-            const a = snake.trail[i];
-            const b = snake.trail[i + 1];
-            if (a.distance <= distance && b.distance >= distance) {
-              const span = b.distance - a.distance || 1;
-              const t = (distance - a.distance) / span;
-              return {
-                x: a.x + (b.x - a.x) * t,
-                y: a.y + (b.y - a.y) * t
-              };
-            }
-          }
-
-          return snake.trail[snake.trail.length - 1];
-        }
-
-        function updateSnake(dt) {
-          if (!snake) return;
-
-          updateHeading();
-
-          const speed = snake.speed + Math.min(score * 2.2, 80);
-          const oldX = snake.x;
-          const oldY = snake.y;
-          snake.x += Math.cos(heading) * speed * dt;
-          snake.y += Math.sin(heading) * speed * dt;
-          snake.currentDistance += Math.hypot(snake.x - oldX, snake.y - oldY);
-
-          snake.trail.unshift({ x: snake.x, y: snake.y, distance: snake.currentDistance });
-
-          while (snake.trail.length > 1 && snake.currentDistance - snake.trail[snake.trail.length - 1].distance > snake.length + 80) {
-            snake.trail.pop();
-          }
-
-          if (snake.x < 12 || snake.y < 12 || snake.x > WORLD.width - 12 || snake.y > WORLD.height - 12) {
-            endGame();
-            return;
-          }
-
-          const bodySampleStep = 14;
-          for (let i = bodySampleStep; i < snake.length; i += bodySampleStep) {
-            const p = getPointAtDistance(snake.currentDistance - i);
-            if (Math.hypot(p.x - snake.x, p.y - snake.y) < snake.radius * 1.55) {
-              endGame();
-              return;
-            }
-          }
-
-          for (let i = apples.length - 1; i >= 0; i--) {
-            const apple = apples[i];
-            if (Math.hypot(apple.x - snake.x, apple.y - snake.y) < snake.radius + APPLE_RADIUS + 4) {
-              apples.splice(i, 1);
-              score += 1;
-              scoreEl.textContent = String(score);
-              snake.length += 14;
-              while (apples.length < MAX_APPLES) spawnApple();
-            }
-          }
-        }
-
-        function drawBackground(cameraX, cameraY) {
-          const gradient = ctx.createLinearGradient(0, 0, width, height);
-          gradient.addColorStop(0, '#13283f');
-          gradient.addColorStop(1, '#091923');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, width, height);
-
-          ctx.strokeStyle = 'rgba(121, 187, 255, 0.12)';
-          ctx.lineWidth = 1;
-          const grid = 32;
-          for (let x = (-cameraX % grid) - grid; x < width + grid; x += grid) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-          }
-          for (let y = (-cameraY % grid) - grid; y < height + grid; y += grid) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
-          }
-
-          ctx.strokeStyle = 'rgba(140, 191, 255, 0.16)';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(-cameraX, -cameraY, WORLD.width, WORLD.height);
-        }
-
-        function drawApple(cameraX, cameraY, timestamp) {
-          for (const apple of apples) {
-            const x = apple.x - cameraX;
-            const y = apple.y - cameraY + Math.sin(timestamp * 0.004 + apple.phase) * 1.4;
-
-            if (x < -30 || x > width + 30 || y < -30 || y > height + 30) continue;
-
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.shadowColor = 'rgba(255, 90, 110, 0.9)';
-            ctx.shadowBlur = 18;
-            ctx.fillStyle = '#ff5872';
-            ctx.beginPath();
-            ctx.arc(0, 1, APPLE_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#ffb2be';
-            ctx.beginPath();
-            ctx.ellipse(-3, -2, 3, 4.8, -0.4, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = '#6BE094';
-            ctx.lineWidth = 2.2;
-            ctx.beginPath();
-            ctx.moveTo(0, -9);
-            ctx.quadraticCurveTo(2, -14, 7, -11);
-            ctx.stroke();
-            ctx.restore();
-          }
-        }
-
-        function drawSnake(cameraX, cameraY) {
-          if (!snake) return;
-
-          const bodyPoints = [];
-          for (let i = 0; i < snake.length; i += 8) {
-            const p = getPointAtDistance(snake.currentDistance - i);
-            bodyPoints.push({ x: p.x - cameraX, y: p.y - cameraY });
-          }
-
-          if (bodyPoints.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(bodyPoints[0].x, bodyPoints[0].y);
-            for (let i = 1; i < bodyPoints.length; i++) {
-              ctx.lineTo(bodyPoints[i].x, bodyPoints[i].y);
-            }
-            ctx.strokeStyle = '#1b8e5e';
-            ctx.lineWidth = 25;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(bodyPoints[0].x, bodyPoints[0].y);
-            for (let i = 1; i < bodyPoints.length; i++) {
-              ctx.lineTo(bodyPoints[i].x, bodyPoints[i].y);
-            }
-            ctx.strokeStyle = '#43d990';
-            ctx.lineWidth = 18;
-            ctx.stroke();
-          }
-
-          const hx = snake.x - cameraX;
-          const hy = snake.y - cameraY;
-
-          ctx.fillStyle = '#62f1a8';
-          ctx.beginPath();
-          ctx.arc(hx, hy, snake.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          const eyeOffset = 5;
-          const eyeX = Math.cos(heading) * 5;
-          const eyeY = Math.sin(heading) * 5;
-
-          for (const side of [-1, 1]) {
-            const ex = hx + eyeX + Math.cos(heading + side * 0.8) * eyeOffset;
-            const ey = hy + eyeY + Math.sin(heading + side * 0.8) * eyeOffset;
-            ctx.fillStyle = '#f2fff7';
-            ctx.beginPath();
-            ctx.arc(ex, ey, 2.7, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#08261b';
-            ctx.beginPath();
-            ctx.arc(ex + 0.9, ey + 0.5, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-
-        function draw(timestamp) {
-          const cameraX = clamp(snake ? snake.x - width * 0.5 : 0, 0, WORLD.width - width);
-          const cameraY = clamp(snake ? snake.y - height * 0.5 : 0, 0, WORLD.height - height);
-
-          drawBackground(cameraX, cameraY);
-          drawApple(cameraX, cameraY, timestamp);
-          drawSnake(cameraX, cameraY);
-        }
-
-        function gameLoop(timestamp) {
-          const dt = Math.min((timestamp - lastTime) / 1000 || 0.016, 0.04);
-          lastTime = timestamp;
-
-          if (running) {
-            updateSnake(dt);
-          }
-
-          draw(timestamp);
-          requestAnimationFrame(gameLoop);
-        }
-
-        function startGame() {
-          resetGame();
-          running = true;
-          overlay.classList.add('hidden');
-          lastTime = performance.now();
-        }
-
-        function endGame() {
-          if (!running) return;
-          running = false;
-
-          if (score > best) {
-            best = score;
-            localStorage.setItem('slitherSnackBest', String(best));
-            bestEl.textContent = String(best);
-          }
-
-          titleEl.textContent = 'Game over';
-          messageEl.textContent = `You scored ${score} ${score === 1 ? 'apple' : 'apples'} — want another run?`;
-          startBtn.textContent = 'Play again';
-          overlay.classList.remove('hidden');
-        }
-
-        startBtn.addEventListener('click', () => {
-          startGame();
-        });
-
-        resetGame();
-        requestAnimationFrame(gameLoop);
-      })();
-    </script>
-  </body>
+    }
+  }
+  function draw(time) {
+    const camX = Math.max(0, Math.min(Math.max(0, WORLD.width - width), snake.x - width / 2));
+    const camY = Math.max(0, Math.min(Math.max(0, WORLD.height - height), snake.y - height / 2));
+    ctx.clearRect(0, 0, width, height);
+    const bg = ctx.createLinearGradient(0, 0, width, height);
+    bg.addColorStop(0, '#14243a'); bg.addColorStop(1, '#101b2c');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#d9e8ff12';
+    const step = 38, sx = -((camX % step) + step) % step, sy = -((camY % step) + step) % step;
+    for (let y = sy; y < height; y += step) for (let x = sx; x < width; x += step) { ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#70a5d322'; ctx.lineWidth = 3; ctx.strokeRect(-camX, -camY, WORLD.width, WORLD.height);
+    for (const a of apples) {
+      const x = a.x - camX, y = a.y - camY + Math.sin(time * .003 + a.phase) * 2;
+      if (x < -30 || x > width + 30 || y < -30 || y > height + 30) continue;
+      ctx.save(); ctx.translate(x, y); ctx.shadowColor = '#ff5c68'; ctx.shadowBlur = 17;
+      ctx.fillStyle = '#ff6470'; ctx.beginPath(); ctx.arc(0, 2, APPLE_R, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#ff9a91'; ctx.beginPath(); ctx.ellipse(-3, -1, 2, 3.5, -.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8ce69b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(1, -7); ctx.quadraticCurveTo(2, -13, 7, -12); ctx.stroke(); ctx.restore();
+    }
+    const points = [];
+    for (let back = Math.floor(snake.length / SPACING) * SPACING; back >= 0; back -= SPACING) points.push(pointAtDistance(back));
+    ctx.beginPath();
+    points.forEach((p, i) => { const x = p.x - camX, y = p.y - camY; if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#147c58'; ctx.lineWidth = 25; ctx.stroke();
+    ctx.strokeStyle = '#42d996'; ctx.lineWidth = 19; ctx.stroke();
+    ctx.globalAlpha = .35; ctx.strokeStyle = '#c1ffe0'; ctx.lineWidth = 4; ctx.stroke(); ctx.globalAlpha = 1;
+    const hx = snake.x - camX, hy = snake.y - camY;
+    ctx.fillStyle = '#52e7a0'; ctx.beginPath(); ctx.arc(hx, hy, 12, 0, Math.PI * 2); ctx.fill();
+    for (const side of [-1, 1]) {
+      const ex = hx + Math.cos(heading) * 4 + Math.cos(heading + side * .72) * 6;
+      const ey = hy + Math.sin(heading) * 4 + Math.sin(heading + side * .72) * 6;
+      ctx.fillStyle = '#f4fff8'; ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#143426'; ctx.beginPath(); ctx.arc(ex + Math.cos(heading) * 1.2, ey + Math.sin(heading) * 1.2, 1.7, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function frame(time) {
+    const dt = Math.min((time - lastTime) / 1000 || 0, .04); lastTime = time;
+    if (running) update(dt);
+    draw(time); requestAnimationFrame(frame);
+  }
+  function startGame() {
+    reset(); running = true; overlay.classList.add('hidden'); lastTime = performance.now();
+    pointer = { x: width / 2, y: height / 2 };
+  }
+  function endGame() {
+    if (!running) return;
+    running = false;
+    if (score > best) { best = score; localStorage.setItem('slitherSnackBest', best); bestEl.textContent = best; }
+    titleEl.textContent = 'Snake bumped!';
+    messageEl.textContent = `You munched ${score} ${score === 1 ? 'apple' : 'apples'}. Fancy another go?`;
+    startButton.textContent = 'Play again'; overlay.classList.remove('hidden');
+  }
+  startButton.addEventListener('click', startGame);
+  reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
 </html>
