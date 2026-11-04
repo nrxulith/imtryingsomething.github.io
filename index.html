@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101b2c">
+  <title>Slither Snack</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-rounded, "Segoe UI", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; overflow: hidden; background: #101b2c; color: #f5f7fb; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .hud { position: fixed; z-index: 2; top: max(20px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; pointer-events: none; }
+    .pill { min-width: 108px; padding: 10px 18px; border: 1px solid #ffffff20; border-radius: 16px; background: #101b2ccc; box-shadow: 0 8px 30px #0003; text-align: center; backdrop-filter: blur(12px); }
+    .pill small { display: block; color: #aab8ca; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .pill strong { display: block; margin-top: 2px; font-size: 22px; line-height: 1.1; }
+    .hint { position: fixed; z-index: 2; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); color: #c0cbda; font-size: 13px; text-shadow: 0 2px 6px #000; pointer-events: none; white-space: nowrap; }
+    .overlay { position: fixed; z-index: 3; inset: 0; display: grid; place-items: center; padding: 24px; background: #09111c88; backdrop-filter: blur(5px); }
+    .card { width: min(420px, 100%); padding: 36px 32px; border: 1px solid #ffffff20; border-radius: 28px; background: linear-gradient(145deg, #1d2b40f5, #111b2bf5); box-shadow: 0 24px 80px #0008; text-align: center; }
+    .emoji { font-size: 42px; filter: drop-shadow(0 5px 12px #fb665566); }
+    h1 { margin: 12px 0 8px; font-size: clamp(30px, 8vw, 42px); letter-spacing: -.04em; }
+    p { margin: 0 auto 24px; max-width: 310px; color: #b6c2d2; line-height: 1.6; }
+    button { border: 0; border-radius: 14px; padding: 13px 28px; color: #102018; background: #82ed9e; font: inherit; font-weight: 850; cursor: pointer; box-shadow: 0 6px 20px #82ed9e33; transition: transform .15s, background .15s; }
+    button:hover { transform: translateY(-2px); background: #a0f5b5; }
+    .hidden { display: none; }
+    @media (max-width: 520px) { .hint { font-size: 11px; } .pill { min-width: 92px; padding: 9px 13px; } }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Snake game. Steer with your pointer or arrow keys."></canvas>
+  <div class="hud" aria-live="polite">
+    <div class="pill"><small>Apples</small><strong id="score">0</strong></div>
+    <div class="pill"><small>Best</small><strong id="best">0</strong></div>
+  </div>
+  <div class="hint">Move your pointer to steer · Arrow keys / WASD also work</div>
+  <div class="overlay" id="overlay">
+    <section class="card">
+      <div class="emoji">🐍</div>
+      <h1 id="title">Slither Snack</h1>
+      <p id="message">A smooth little snake, a field full of apples. Guide your snake around and see how long you can grow!</p>
+      <button id="start">Let's slither</button>
+    </section>
+  </div>
+<script>
+(() => {
+  const canvas = document.querySelector('#game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.querySelector('#score');
+  const bestEl = document.querySelector('#best');
+  const overlay = document.querySelector('#overlay');
+  const titleEl = document.querySelector('#title');
+  const messageEl = document.querySelector('#message');
+  const startButton = document.querySelector('#start');
+  const WORLD = { width: 2600, height: 1900 };
+  const APPLE_R = 9;
+  const SPACING = 10;
+  let width = innerWidth, height = innerHeight, dpr = 1;
+  let running = false, lastTime = 0, score = 0;
+  let best = Number(localStorage.getItem('slitherSnackBest') || 0);
+  let snake, apples, heading, targetHeading, pointer = { x: width / 2, y: height / 2 }, keys = {};
+  bestEl.textContent = best;
+
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    width = innerWidth; height = innerHeight;
+    canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener('resize', resize); resize();
+
+  function reset() {
+    const x = WORLD.width / 2, y = WORLD.height / 2;
+    heading = targetHeading = -Math.PI / 2;
+    snake = { x, y, trail: [{ x, y }], distance: 0, length: 115, radius: 11 };
+    apples = [];
+    for (let i = 0; i < 32; i++) spawnApple();
+    score = 0; scoreEl.textContent = '0';
+  }
+  function spawnApple() {
+    apples.push({ x: 45 + Math.random() * (WORLD.width - 90), y: 45 + Math.random() * (WORLD.height - 90), phase: Math.random() * Math.PI * 2 });
+  }
+  function angleDiff(a, b) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+  function setTargetFromPointer() {
+    const dx = pointer.x - width / 2, dy = pointer.y - height / 2;
+    if (Math.hypot(dx, dy) > 12) targetHeading = Math.atan2(dy, dx);
+  }
+  canvas.addEventListener('pointermove', e => { pointer = { x: e.clientX, y: e.clientY }; setTargetFromPointer(); });
+  canvas.addEventListener('pointerdown', e => { pointer = { x: e.clientX, y: e.clientY }; setTargetFromPointer(); });
+  addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) e.preventDefault();
+    keys[key] = true;
+    if (!running && (key === 'enter' || key === ' ')) startGame();
+  });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  function update(dt) {
+    const horizontal = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+    const vertical = (keys.arrowdown || keys.s ? 1 : 0) - (keys.arrowup || keys.w ? 1 : 0);
+    if (horizontal || vertical) targetHeading = Math.atan2(vertical, horizontal);
+    heading += Math.max(-3.0 * dt, Math.min(3.0 * dt, angleDiff(heading, targetHeading)));
+    const speed = 155 + Math.min(score, 30) * 1.2;
+    const oldX = snake.x, oldY = snake.y;
+    snake.x += Math.cos(heading) * speed * dt;
+    snake.y += Math.sin(heading) * speed * dt;
+    snake.distance += Math.hypot(snake.x - oldX, snake.y - oldY);
+    snake.trail.unshift({ x: snake.x, y: snake.y, d: snake.distance });
+    while (snake.trail.length > 2 && snake.distance - snake.trail[snake.trail.length - 1].d > snake.length + 80) snake.trail.pop();
+    if (snake.x < 22 || snake.y < 22 || snake.x > WORLD.width - 22 || snake.y > WORLD.height - 22) return endGame();
+
+    for (let i = apples.length - 1; i >= 0; i--) {
+      const a = apples[i];
+      if (Math.hypot(a.x - snake.x, a.y - snake.y) < snake.radius + APPLE_R + 3) {
+        apples.splice(i, 1); spawnApple(); score++; snake.length += 14;
+        scoreEl.textContent = score;
+      }
+    }
+    // Check the head against the older body, skipping the tight turn immediately behind it.
+    for (let d = 48; d < snake.length; d += 11) {
+      const p = pointAtDistance(d);
+      if (Math.hypot(p.x - snake.x, p.y - snake.y) < snake.radius * 1.45) return endGame();
+    }
+  }
+  function pointAtDistance(back) {
+    const target = snake.distance - back;
+    for (let i = 0; i < snake.trail.length - 1; i++) {
+      const a = snake.trail[i], b = snake.trail[i + 1];
+      if (a.d >= target && b.d <= target) {
+        const t = (a.d - target) / Math.max(.001, a.d - b.d);
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+    }
+    return snake.trail[snake.trail.length - 1];
+  }
+  function draw(time) {
+    const camX = snake ? Math.max(0, Math.min(WORLD.width - width, snake.x - width / 2)) : 0;
+    const camY = snake ? Math.max(0, Math.min(WORLD.height - height, snake.y - height / 2)) : 0;
+    ctx.clearRect(0, 0, width, height);
+    const bg = ctx.createLinearGradient(0, 0, width, height);
+    bg.addColorStop(0, '#14243a'); bg.addColorStop(1, '#101b2c');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height);
+    // Subtle dotted field gives a sense of motion without imposing a game grid.
+    ctx.fillStyle = '#d9e8ff12';
+    const step = 38, sx = -((camX % step) + step) % step, sy = -((camY % step) + step) % step;
+    for (let y = sy; y < height; y += step) for (let x = sx; x < width; x += step) { ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill(); }
+    // Arena edge
+    ctx.strokeStyle = '#70a5d322'; ctx.lineWidth = 3;
+    ctx.strokeRect(-camX, -camY, WORLD.width, WORLD.height);
+    for (const a of apples || []) {
+      const x = a.x - camX, y = a.y - camY;
+      if (x < -30 || x > width + 30 || y < -30 || y > height + 30) continue;
+      const bob = Math.sin(time * .003 + a.phase) * 2;
+      ctx.save(); ctx.translate(x, y + bob);
+      ctx.shadowColor = '#ff5c68'; ctx.shadowBlur = 17;
+      ctx.fillStyle = '#ff6470'; ctx.beginPath(); ctx.arc(0, 2, APPLE_R, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#ff9a91'; ctx.beginPath(); ctx.ellipse(-3, -1, 2, 3.5, -.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#8ce69b'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(1, -7); ctx.quadraticCurveTo(2, -13, 7, -12); ctx.stroke();
+      ctx.restore();
+    }
+    if (snake) drawSnake(camX, camY);
+  }
+  function drawSnake(camX, camY) {
+    const count = Math.floor(snake.length / SPACING);
+    const points = [];
+    for (let i = count; i >= 0; i--) points.push(pointAtDistance(i * SPACING));
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    points.forEach((p, i) => { const x = p.x - camX, y = p.y - camY; if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+    ctx.strokeStyle = '#147c58'; ctx.lineWidth = 25; ctx.stroke();
+    ctx.strokeStyle = '#42d996'; ctx.lineWidth = 19; ctx.stroke();
+    // Soft highlight along the smooth body
+    ctx.globalAlpha = .35; ctx.strokeStyle = '#c1ffe0'; ctx.lineWidth = 4; ctx.stroke(); ctx.globalAlpha = 1;
+    const hx = snake.x - camX, hy = snake.y - camY;
+    ctx.fillStyle = '#52e7a0'; ctx.beginPath(); ctx.arc(hx, hy, 12, 0, Math.PI * 2); ctx.fill();
+    const eyeX = Math.cos(heading + .75) * 6, eyeY = Math.sin(heading + .75) * 6;
+    for (const side of [-1, 1]) {
+      const ex = hx + Math.cos(heading) * 4 + Math.cos(heading + side * .72) * 6;
+      const ey = hy + Math.sin(heading) * 4 + Math.sin(heading + side * .72) * 6;
+      ctx.fillStyle = '#f4fff8'; ctx.beginPath(); ctx.arc(ex, ey, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#143426'; ctx.beginPath(); ctx.arc(ex + Math.cos(heading) * 1.2, ey + Math.sin(heading) * 1.2, 1.7, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function frame(time) {
+    const dt = Math.min((time - lastTime) / 1000 || 0, .04); lastTime = time;
+    if (running) update(dt);
+    draw(time);
+    requestAnimationFrame(frame);
+  }
+  function startGame() {
+    reset(); running = true; overlay.classList.add('hidden'); lastTime = performance.now();
+    pointer = { x: width / 2, y: height / 2 - 100 };
+    targetHeading = heading;
+  }
+  function endGame() {
+    if (!running) return;
+    running = false;
+    if (score > best) { best = score; localStorage.setItem('slitherSnackBest', best); bestEl.textContent = best; }
+    titleEl.textContent = 'Snake bumped!';
+    messageEl.textContent = `You munched ${score} ${score === 1 ? 'apple' : 'apples'}. Fancy another go?`;
+    startButton.textContent = 'Play again'; overlay.classList.remove('hidden');
+  }
+  startButton.addEventListener('click', startGame);
+  reset(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
