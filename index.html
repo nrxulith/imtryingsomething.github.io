@@ -1,295 +1,486 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101b2c">
   <title>Slither Snack</title>
   <style>
-    :root { color-scheme: dark; --bg:#101b2c; --bg2:#172941; --text:#f5f7fb; --muted:#b6c4d5; --panel:#142238eF; --line:#ffffff24; --hud:#101b2ccc; --grid:#d9e8ff12; --accent:#82ed9e; --accentText:#102018; }
-    html[data-theme="light"] { color-scheme:light; --bg:#e9f4ed; --bg2:#d5eadc; --text:#20332a; --muted:#536b5d; --panel:#f7fff5f2; --line:#284b3426; --hud:#f4fff0d9; --grid:#285c3610; --accent:#40c879; --accentText:#082316; }
-    * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; overflow:hidden; color:var(--text); background:var(--bg); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; transition:background .2s,color .2s; }
-    canvas { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
-    .hud { position:fixed; z-index:2; top:max(16px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; gap:9px; pointer-events:none; }
-    .pill { min-width:82px; padding:8px 13px; border:1px solid var(--line); border-radius:15px; background:var(--hud); text-align:center; backdrop-filter:blur(10px); box-shadow:0 6px 22px #0002; }
-    .pill small { display:block; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
-    .pill strong { display:block; margin-top:2px; font-size:20px; line-height:1.1; }
-    .top-actions { position:fixed; z-index:4; top:max(16px,env(safe-area-inset-top)); right:16px; display:flex; gap:8px; }
-    .tiny-button,.shop-button { border:1px solid var(--line); border-radius:13px; padding:9px 13px; color:var(--text); background:var(--hud); font:700 13px system-ui,sans-serif; cursor:pointer; backdrop-filter:blur(10px); }
-    .tiny-button:hover,.shop-button:hover { filter:brightness(1.13); }
-    .shop-button { position:fixed; z-index:4; left:16px; top:max(16px,env(safe-area-inset-top)); display:none; }
-    .shop-button.visible { display:block; }
-    .hint { position:fixed; z-index:2; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); transform:translateX(-50%); color:var(--muted); font-size:12px; text-shadow:0 1px 5px #0007; white-space:nowrap; pointer-events:none; text-align:center; }
-    .overlay { position:fixed; z-index:10; inset:0; display:grid; place-items:center; padding:20px; background:#07111d80; backdrop-filter:blur(5px); }
-    .overlay.hidden { display:none; }
-    .card { width:min(440px,100%); max-height:min(90vh,760px); overflow:auto; padding:30px 26px 24px; border:1px solid var(--line); border-radius:26px; background:var(--panel); box-shadow:0 24px 80px #0006; text-align:center; }
-    .emoji { font-size:42px; } h1 { margin:8px 0; font-size:clamp(28px,7vw,40px); letter-spacing:-.045em; }
-    p { margin:0 auto 20px; max-width:340px; color:var(--muted); line-height:1.55; }
-    .mode-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    button { font:inherit; cursor:pointer; }
-    .mode-button,.primary-button,.secondary-button,.upgrade-button { border:0; border-radius:14px; padding:13px 15px; color:var(--accentText); background:var(--accent); font-weight:850; transition:transform .12s,filter .12s; }
-    .mode-button:hover,.primary-button:hover,.secondary-button:hover,.upgrade-button:hover { transform:translateY(-1px); filter:brightness(1.06); }
-    .mode-button span { display:block; margin-top:4px; font-size:11px; font-weight:600; opacity:.77; }
-    .secondary-button { color:var(--text); background:#687b9140; border:1px solid var(--line); }
-    .primary-button { min-width:150px; }
-    .card-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:9px; margin-top:14px; }
-    .shop-card { width:min(500px,100%); }
-    .upgrade-list { display:grid; gap:10px; margin:18px 0 8px; text-align:left; }
-    .upgrade { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px; border:1px solid var(--line); border-radius:15px; background:#7890a110; }
-    .upgrade strong { display:block; } .upgrade small { display:block; margin-top:3px; color:var(--muted); line-height:1.35; }
-    .upgrade-button { flex:0 0 auto; padding:10px 12px; font-size:12px; }
-    .upgrade-button:disabled { opacity:.55; cursor:default; transform:none; }
-    .hidden { display:none !important; }
-    @media(max-width:540px) { .top-actions { right:10px; } .shop-button { left:10px; } .pill { min-width:68px; padding:7px 9px; } .pill strong { font-size:18px; } .hint { width:95%; white-space:normal; font-size:11px; } .card { padding:25px 18px 20px; } }
+    :root {
+      --bg: #101b2c;
+      --panel: rgba(17, 27, 43, 0.9);
+      --muted: #b7c6d9;
+      --line: rgba(255,255,255,0.15);
+      --accent: #82ed9e;
+      --text: #f5f7fb;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      background: linear-gradient(180deg, #12233d, #0f1c2f);
+    }
+    .hud {
+      position: fixed;
+      inset: max(18px, env(safe-area-inset-top)) auto auto 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .pill {
+      min-width: 104px;
+      padding: 9px 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(16, 27, 44, 0.7);
+      text-align: center;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
+    .pill small {
+      display: block;
+      font-size: 9px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: #c5d1e4;
+      opacity: .8;
+    }
+    .pill strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 21px;
+      line-height: 1.1;
+    }
+    .hint {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      color: rgba(229, 236, 247, 0.9);
+      font-size: 12px;
+      letter-spacing: .01em;
+      z-index: 2;
+      pointer-events: none;
+      text-shadow: 0 2px 6px rgba(0,0,0,.4);
+    }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      background: rgba(5, 10, 18, 0.45);
+      backdrop-filter: blur(7px);
+    }
+    .overlay.hidden { display: none; }
+    .card {
+      width: min(420px, calc(100vw - 32px));
+      padding: 32px 28px 26px;
+      border-radius: 26px;
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(31,44,66,.98), rgba(16,27,44,.96));
+      box-shadow: 0 30px 80px rgba(0,0,0,.42);
+      text-align: center;
+    }
+    .emoji { font-size: 42px; }
+    h1 {
+      margin: 12px 0 8px;
+      font-size: clamp(32px, 5vw, 42px);
+      letter-spacing: -.04em;
+      line-height: 1.05;
+    }
+    p {
+      margin: 0 auto 22px;
+      max-width: 300px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    button {
+      border: 0;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #102018;
+      padding: 13px 24px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(130,237,158,.3);
+    }
+    button:hover { filter: brightness(1.05); }
   </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Snake game. Steer with your pointer, touch, or arrow keys."></canvas>
+  <canvas id="game" aria-label="Snake game. Steer with the pointer or arrow keys."></canvas>
+
   <div class="hud" aria-live="polite">
     <div class="pill"><small>Apples</small><strong id="score">0</strong></div>
     <div class="pill"><small>Best</small><strong id="best">0</strong></div>
-    <div class="pill hidden" id="coinsPill"><small>Glow points</small><strong id="coins">0</strong></div>
   </div>
-  <div class="top-actions"><button class="tiny-button" id="themeButton" aria-label="Toggle color theme">☀️ Light</button></div>
-  <button class="shop-button" id="shopButton">✨ Buffs</button>
-  <div class="hint" id="hint">Move your pointer to steer · Arrow keys / WASD also work</div>
+
+  <div class="hint">Move your pointer to steer · Arrow keys / WASD also work</div>
 
   <div class="overlay" id="overlay">
-    <section class="card">
-      <div class="emoji">🐍</div><h1 id="title">Slither Snack</h1>
-      <p id="message">Pick a mode and see how many apples you can collect!</p>
-      <div class="mode-buttons" id="modeButtons">
-        <button class="mode-button" data-mode="classic">Classic<span>Chill apple collecting</span></button>
-        <button class="mode-button" data-mode="wild">Wild Grove<span>Meteors, trees & unlockable buffs</span></button>
-      </div>
-      <div class="card-actions hidden" id="resultActions">
-        <button class="primary-button" id="againButton">Play again</button>
-        <button class="secondary-button" id="chooseButton">Choose mode</button>
-        <button class="secondary-button hidden" id="deathShopButton">Spend glow points</button>
-      </div>
-    </section>
+    <div class="card">
+      <div class="emoji">🐍</div>
+      <h1 id="title">Slither Snack</h1>
+      <p id="message">Keep the snake moving, eat the apples, and grow longer without crashing.</p>
+      <button id="start">Let's slither</button>
+    </div>
   </div>
 
-  <div class="overlay hidden" id="shopOverlay">
-    <section class="card shop-card">
-      <div class="emoji">✨</div><h1>Wild buffs</h1>
-      <p>Every apple is one glow point. Collect apples, then spend your points to unlock permanent perks.</p>
-      <div class="upgrade-list" id="upgradeList"></div>
-      <div class="card-actions"><button class="secondary-button" id="closeShop">Done</button></div>
-    </section>
-  </div>
-<script>
-(() => {
-  const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d');
-  const scoreEl = document.querySelector('#score'), bestEl = document.querySelector('#best');
-  const coinsEl = document.querySelector('#coins'), coinsPill = document.querySelector('#coinsPill');
-  const overlay = document.querySelector('#overlay'), titleEl = document.querySelector('#title'), messageEl = document.querySelector('#message');
-  const modeButtons = document.querySelector('#modeButtons'), resultActions = document.querySelector('#resultActions');
-  const shopOverlay = document.querySelector('#shopOverlay'), upgradeList = document.querySelector('#upgradeList');
-  const shopButton = document.querySelector('#shopButton'), deathShopButton = document.querySelector('#deathShopButton');
-  const themeButton = document.querySelector('#themeButton'), hint = document.querySelector('#hint');
-  const upgrades = [
-    { id:'dash', name:'Comet dash', cost:8, desc:'Hold Space or Shift for a quick burst of speed (5 sec cooldown).' },
-    { id:'thin', name:'Little noodle', cost:5, desc:'A slimmer snake is more nimble and has a smaller collision radius.' }
-  ];
-  let width = innerWidth, height = innerHeight, dpr = 1;
-  let mode = 'classic', running = false, lastTime = 0, score = 0, best = 0, points = 0;
-  let snake, apples = [], trees = [], meteors = [], heading = -Math.PI / 2, targetHeading = heading;
-  let pointer = { x: width / 2, y: height / 2 }, keys = {}, eventTimer = 8, dashTime = 0, dashCooldown = 0;
-  let resumeAfterShop = false;
-  const safeLoad = (key, fallback) => { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } };
-  const savedTheme = safeLoad('slitherTheme', 'dark');
-  document.documentElement.dataset.theme = savedTheme === 'light' ? 'light' : 'dark';
-  best = safeLoad('slitherBestClassic', 0); points = safeLoad('slitherGlowPoints', 0);
-  let unlocked = safeLoad('slitherBuffs', { dash:false, thin:false });
-  if (!unlocked || typeof unlocked !== 'object') unlocked = { dash:false, thin:false };
-  bestEl.textContent = best; coinsEl.textContent = points;
-  updateThemeButton();
+  <script>
+    (() => {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const scoreEl = document.getElementById('score');
+      const bestEl = document.getElementById('best');
+      const overlay = document.getElementById('overlay');
+      const titleEl = document.getElementById('title');
+      const messageEl = document.getElementById('message');
+      const startButton = document.getElementById('start');
 
-  function resize() {
-    dpr = Math.min(devicePixelRatio || 1, 2); width = innerWidth; height = innerHeight;
-    canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // The arena is exactly the visible screen. Keep a live snake inside after a resize.
-    if (snake) { snake.x = clamp(snake.x, 25, width - 25); snake.y = clamp(snake.y, 25, height - 25); }
-    if (running && mode === 'wild') makeTrees();
-  }
-  addEventListener('resize', resize); resize();
-  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
-  function angleDiff(a,b) { return Math.atan2(Math.sin(b-a), Math.cos(b-a)); }
-  function updateThemeButton() { themeButton.textContent = document.documentElement.dataset.theme === 'dark' ? '☀️ Light' : '🌙 Dark'; }
-  themeButton.addEventListener('click', () => {
-    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = theme; localStorage.setItem('slitherTheme', JSON.stringify(theme)); updateThemeButton();
-  });
-  addEventListener('pointermove', e => { pointer = { x:e.clientX, y:e.clientY }; });
-  addEventListener('pointerdown', e => { pointer = { x:e.clientX, y:e.clientY }; });
-  addEventListener('keydown', e => {
-    const key = e.key.toLowerCase();
-    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(key)) e.preventDefault();
-    keys[key] = true;
-    if (running && mode === 'wild' && unlocked.dash && (key === ' ' || key === 'shift') && dashCooldown <= 0) { dashTime = 1.15; dashCooldown = 5; }
-  });
-  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-  addEventListener('blur', () => { keys = {}; });
+      const WORLD = { w: 2600, h: 1900 };
+      const APPLE_R = 9;
+      const DIRTY_POINT = 120;
 
-  function spawnApple() {
-    let x, y, tries = 0;
-    do {
-      x = 24 + Math.random() * Math.max(1, width - 48); y = 24 + Math.random() * Math.max(1, height - 48); tries++;
-    } while (mode === 'wild' && tries < 40 && trees.some(t => Math.hypot(x-t.x,y-t.y) < t.r + 34));
-    apples.push({ x, y, phase:Math.random()*Math.PI*2 });
-  }
-  function makeTrees() {
-    trees = [];
-    const count = Math.min(8, Math.floor(width * height / 90000));
-    for (let i=0; i<count; i++) {
-      let x, y, tries=0;
-      do { x=50+Math.random()*Math.max(1,width-100); y=65+Math.random()*Math.max(1,height-130); tries++; }
-      while (tries<30 && ((snake && Math.hypot(x-snake.x,y-snake.y)<150) || trees.some(t=>Math.hypot(x-t.x,y-t.y)<85)));
-      trees.push({x,y,r:17+Math.random()*5});
-    }
-  }
-  function resetGame(which) {
-    mode = which; score = 0; scoreEl.textContent = '0';
-    width = innerWidth; height = innerHeight;
-    heading = targetHeading = -Math.PI/2;
-    snake = { x:width/2, y:height/2, trail:[{x:width/2,y:height/2,d:0}], distance:0, length:115, radius:unlocked.thin && mode==='wild' ? 8 : 11 };
-    apples=[]; trees=[]; meteors=[]; eventTimer=7; dashTime=0; dashCooldown=0;
-    if (mode === 'wild') makeTrees();
-    for (let i=0; i<Math.min(32,Math.max(14,Math.floor(width*height/22000))); i++) spawnApple();
-    coinsPill.classList.toggle('hidden', mode !== 'wild'); shopButton.classList.toggle('visible', mode === 'wild');
-    hint.textContent = mode === 'wild' ? (unlocked.dash ? 'Move to steer · Space / Shift to dash · Dodge the meteor warnings!' : 'Move to steer · Dodge trees and meteor warnings!') : 'Move your pointer to steer · Arrow keys / WASD also work';
-  }
-  function pointAtDistance(back) {
-    const target = snake.distance-back;
-    for (let i=0;i<snake.trail.length-1;i++) {
-      const a=snake.trail[i], b=snake.trail[i+1];
-      if (a.d>=target && b.d<=target) { const t=(a.d-target)/Math.max(.001,a.d-b.d); return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t}; }
-    }
-    return snake.trail[snake.trail.length-1];
-  }
-  function startGame(which) {
-    resetGame(which); running=true; lastTime=performance.now(); pointer={x:width/2,y:height/2-100};
-    overlay.classList.add('hidden'); modeButtons.classList.remove('hidden'); resultActions.classList.add('hidden');
-  }
-  function endGame() {
-    if (!running) return;
-    running=false;
-    const key = mode === 'wild' ? 'slitherBestWild' : 'slitherBestClassic';
-    const oldBest = Number(safeLoad(key, 0));
-    if (score > oldBest) { localStorage.setItem(key, JSON.stringify(score)); best=score; bestEl.textContent=score; }
-    if (mode === 'wild' && score > 0) { points += score; localStorage.setItem('slitherGlowPoints',JSON.stringify(points)); coinsEl.textContent=points; }
-    titleEl.textContent = mode === 'wild' ? 'Wild run over!' : 'Snake bumped!';
-    messageEl.textContent = mode === 'wild' ? `You collected ${score} apples and earned ${score} glow ${score===1?'point':'points'}. Spend them on permanent buffs!` : `You munched ${score} ${score===1?'apple':'apples'}. Fancy another go?`;
-    modeButtons.classList.add('hidden'); resultActions.classList.remove('hidden');
-    deathShopButton.classList.toggle('hidden', mode !== 'wild');
-    document.querySelector('#againButton').textContent = 'Play again'; overlay.classList.remove('hidden');
-  }
-  function update(dt) {
-    const horizontal=(keys.arrowright||keys.d?1:0)-(keys.arrowleft||keys.a?1:0);
-    const vertical=(keys.arrowdown||keys.s?1:0)-(keys.arrowup||keys.w?1:0);
-    if(horizontal||vertical) targetHeading=Math.atan2(vertical,horizontal);
-    else { const dx=pointer.x-snake.x, dy=pointer.y-snake.y; if(Math.hypot(dx,dy)>8) targetHeading=Math.atan2(dy,dx); }
-    const turnRate=5.1; heading+=clamp(angleDiff(heading,targetHeading),-turnRate*dt,turnRate*dt);
-    dashTime=Math.max(0,dashTime-dt); dashCooldown=Math.max(0,dashCooldown-dt);
-    const speed=(215+Math.min(score,35)*1.3)*(dashTime>0?2.05:1);
-    const ox=snake.x, oy=snake.y; snake.x+=Math.cos(heading)*speed*dt; snake.y+=Math.sin(heading)*speed*dt;
-    snake.distance+=Math.hypot(snake.x-ox,snake.y-oy); snake.trail.unshift({x:snake.x,y:snake.y,d:snake.distance});
-    while(snake.trail.length>2 && snake.distance-snake.trail[snake.trail.length-1].d>snake.length+80) snake.trail.pop();
-    if(snake.x<snake.radius+1||snake.y<snake.radius+1||snake.x>width-snake.radius-1||snake.y>height-snake.radius-1) return endGame();
-    const actualLength=Math.min(snake.length,snake.distance);
-    for(let back=32;back<actualLength;back+=10) { const p=pointAtDistance(back); if(Math.hypot(p.x-snake.x,p.y-snake.y)<snake.radius*1.5) return endGame(); }
-    if(mode==='wild') {
-      for(const tree of trees) if(Math.hypot(tree.x-snake.x,tree.y-snake.y)<tree.r+snake.radius-2) return endGame();
-      eventTimer-=dt;
-      if(eventTimer<=0) { spawnMeteor(); eventTimer=9+Math.random()*5; }
-      for(let i=meteors.length-1;i>=0;i--) {
-        const m=meteors[i]; m.timer-=dt;
-        if(m.timer<=0) { if(Math.hypot(m.x-snake.x,m.y-snake.y)<m.r+snake.radius) return endGame(); m.flash=.5; m.timer=-.5; }
-        if(m.timer<-.5) { m.flash-=dt; if(m.flash<=0) meteors.splice(i,1); }
+      let width = innerWidth;
+      let height = innerHeight;
+      let dpr = 1;
+      let running = false;
+      let lastTime = 0;
+      let score = 0;
+      let best = 0;
+      let snake;
+      let apples = [];
+      let heading = -Math.PI / 2;
+      let targetHeading = heading;
+      let pointer = { x: width / 2, y: height / 2 };
+      const keys = {};
+
+      try {
+        best = Number(localStorage.getItem('slither-best')) || 0;
+      } catch (e) {}
+      bestEl.textContent = String(best);
+
+      function resize() {
+        dpr = Math.min(devicePixelRatio || 1, 2);
+        width = innerWidth;
+        height = innerHeight;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
-    }
-    for(let i=apples.length-1;i>=0;i--) {
-      const a=apples[i]; if(Math.hypot(a.x-snake.x,a.y-snake.y)<snake.radius+APPLE_R+4) { apples.splice(i,1); score++; scoreEl.textContent=score; snake.length+=14; spawnApple(); }
-    }
-  }
-  function spawnMeteor() {
-    let x,y,tries=0;
-    do { x=35+Math.random()*Math.max(1,width-70); y=45+Math.random()*Math.max(1,height-90); tries++; }
-    while(tries<30 && Math.hypot(x-snake.x,y-snake.y)<Math.min(125,Math.min(width,height)*.25));
-    meteors.push({x,y,r:Math.max(34,Math.min(54,Math.min(width,height)*.12)),timer:1.8,flash:0});
-  }
-  function drawApple(a,time) {
-    const x=a.x, y=a.y+Math.sin(time*.004+a.phase)*1.5;
-    ctx.save(); ctx.translate(x,y); ctx.shadowColor='#ff5167'; ctx.shadowBlur=14;
-    ctx.fillStyle='#ed3e55'; ctx.beginPath();
-    ctx.moveTo(0,8); ctx.bezierCurveTo(-3,6,-12,0,-10,-6); ctx.bezierCurveTo(-9,-12,-2,-12,0,-7); ctx.bezierCurveTo(3,-13,10,-11,11,-5); ctx.bezierCurveTo(13,1,4,8,0,8); ctx.fill();
-    ctx.shadowBlur=0; ctx.fillStyle='#ff9aa4'; ctx.beginPath(); ctx.ellipse(-4,-5,2.1,3.8,-.4,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='#7edb78'; ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(0,-8); ctx.quadraticCurveTo(0,-14,5,-14); ctx.stroke();
-    ctx.fillStyle='#7ee38a'; ctx.beginPath(); ctx.ellipse(5,-12,4,2, -.4,0,Math.PI*2); ctx.fill(); ctx.restore();
-  }
-  function draw(time) {
-    const light=document.documentElement.dataset.theme==='light';
-    const bg=ctx.createLinearGradient(0,0,width,height);
-    bg.addColorStop(0,light?'#e7f5e9':'#14243a'); bg.addColorStop(1,light?'#cfe7d4':'#101b2c');
-    ctx.fillStyle=bg; ctx.fillRect(0,0,width,height);
-    ctx.fillStyle=light?'#285c360c':'#d9e8ff12';
-    const step=38; for(let y=step/2;y<height;y+=step) for(let x=step/2;x<width;x+=step){ctx.beginPath();ctx.arc(x,y,1.3,0,Math.PI*2);ctx.fill();}
-    if(mode==='wild') {
-      for(const t of trees) {
-        ctx.fillStyle=light?'#805a39':'#73503a'; ctx.fillRect(t.x-5,t.y-1,10,20);
-        ctx.fillStyle=light?'#388b53':'#27754d'; ctx.beginPath(); ctx.arc(t.x,t.y-5,t.r,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle=light?'#65b978':'#46a66d'; ctx.beginPath(); ctx.arc(t.x-5,t.y-10,t.r*.58,0,Math.PI*2); ctx.fill();
+      addEventListener('resize', resize);
+      resize();
+
+      function clamp(v, lo, hi) {
+        return Math.max(lo, Math.min(hi, v));
       }
-      for(const m of meteors) {
-        if(m.timer>0) { ctx.fillStyle=`rgba(255,60,65,${.12+.09*Math.sin(time*.02)})`; ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#ff6969'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2); ctx.stroke();
-          ctx.fillStyle='#fff4dc';ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText('MOVE!',m.x,m.y+4);
-        } else { ctx.fillStyle=`rgba(255,110,45,${Math.max(0,m.flash*1.5)})`;ctx.beginPath();ctx.arc(m.x,m.y,m.r*(1.2-m.flash*.3),0,Math.PI*2);ctx.fill(); }
+
+      function angleDiff(a, b) {
+        return Math.atan2(Math.sin(b - a), Math.cos(b - a));
       }
-    }
-    for(const a of apples) drawApple(a,time);
-    const pts=[]; for(let back=Math.floor(snake.length/SPACING)*SPACING;back>=0;back-=SPACING) pts.push(pointAtDistance(back));
-    if(pts.length>1) {
-      ctx.beginPath(); pts.forEach((p,i)=>{if(!i)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});
-      ctx.lineCap='round';ctx.lineJoin='round';const radius=snake.radius;const widthBase=(unlocked.thin&&mode==='wild'?15:19)*(radius/11);
-      ctx.strokeStyle='#145f48';ctx.lineWidth=widthBase+7;ctx.stroke();
-      ctx.strokeStyle=mode==='wild'?'#54c8ee':'#42d996';ctx.lineWidth=widthBase;ctx.stroke();
-      ctx.globalAlpha=.32;ctx.strokeStyle='#e3fff0';ctx.lineWidth=3;ctx.stroke();ctx.globalAlpha=1;
-    }
-    // Round head with friendly eyes, tiny blush spots and a forked tongue.
-    ctx.save();ctx.translate(snake.x,snake.y);ctx.rotate(heading);
-    ctx.fillStyle=mode==='wild'?'#73dbf5':'#63efa6';ctx.beginPath();ctx.ellipse(0,0,snake.radius+2,snake.radius,0,0,Math.PI*2);ctx.fill();
-    for(const side of [-1,1]) {
-      ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(4,side*5,3.3,4,0,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#17362a';ctx.beginPath();ctx.arc(5,side*5,1.55,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#ff9fa9aa';ctx.beginPath();ctx.arc(-2,side*8,2,0,Math.PI*2);ctx.fill();
-    }
-    ctx.strokeStyle='#f57992';ctx.lineWidth=1.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(snake.radius+1,0);ctx.lineTo(snake.radius+6,0);ctx.lineTo(snake.radius+8,-2);ctx.moveTo(snake.radius+6,0);ctx.lineTo(snake.radius+8,2);ctx.stroke();ctx.restore();
-    if(mode==='wild'&&unlocked.dash) { ctx.fillStyle='var(--text)';ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillText(dashTime>0?'DASH!':dashCooldown>0?`Dash ${dashCooldown.toFixed(1)}s`:'Dash ready',12,height-48); }
-  }
-  function frame(time) { const dt=Math.min((time-lastTime)/1000||0,.04);lastTime=time;if(running)update(dt);draw(time);requestAnimationFrame(frame); }
-  function showShop() { resumeAfterShop=running; running=false; renderShop(); shopOverlay.classList.remove('hidden'); }
-  function renderShop() {
-    upgradeList.replaceChildren();
-    for(const buff of upgrades) {
-      const item=document.createElement('div');item.className='upgrade';
-      const info=document.createElement('div');const name=document.createElement('strong');name.textContent=buff.name;
-      const desc=document.createElement('small');desc.textContent=buff.desc;info.append(name,desc);
-      const button=document.createElement('button');button.className='upgrade-button';
-      if(unlocked[buff.id]) {button.textContent='Unlocked ✓';button.disabled=true;}
-      else {button.textContent=`Unlock · ${buff.cost} ✨`;button.disabled=points<buff.cost;button.addEventListener('click',()=>{if(points<buff.cost)return;points-=buff.cost;unlocked[buff.id]=true;localStorage.setItem('slitherGlowPoints',JSON.stringify(points));localStorage.setItem('slitherBuffs',JSON.stringify(unlocked));coinsEl.textContent=points;renderShop();hint.textContent=unlocked.dash?'Move to steer · Space / Shift to dash · Dodge the meteor warnings!':hint.textContent;});}
-      item.append(info,button);upgradeList.append(item);
-    }
-  }
-  shopButton.addEventListener('click',showShop);deathShopButton.addEventListener('click',showShop);
-  document.querySelector('#closeShop').addEventListener('click',()=>{shopOverlay.classList.add('hidden');if(resumeAfterShop){running=true;lastTime=performance.now();}});
-  document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>startGame(button.dataset.mode)));
-  document.querySelector('#againButton').addEventListener('click',()=>startGame(mode));
-  document.querySelector('#chooseButton').addEventListener('click',()=>{titleEl.textContent='Slither Snack';messageEl.textContent='Pick a mode and see how many apples you can collect!';resultActions.classList.add('hidden');modeButtons.classList.remove('hidden');});
-  resetGame('classic'); requestAnimationFrame(frame);
-})();
-</script>
+
+      function resetGame() {
+        const cx = WORLD.w / 2;
+        const cy = WORLD.h / 2;
+        heading = targetHeading = -Math.PI / 2;
+
+        snake = {
+          x: cx,
+          y: cy,
+          radius: 11,
+          length: 120,
+          distance: 0,
+          trail: []
+        };
+
+        for (let i = 0; i <= 45; i++) {
+          snake.trail.push({
+            x: cx - Math.cos(heading) * i * 2,
+            y: cy - Math.sin(heading) * i * 2,
+            d: i * 2
+          });
+        }
+
+        apples = [];
+        for (let i = 0; i < 28; i++) spawnApple();
+        score = 0;
+        scoreEl.textContent = '0';
+      }
+
+      function spawnApple() {
+        let x = 30 + Math.random() * (WORLD.w - 60);
+        let y = 30 + Math.random() * (WORLD.h - 60);
+        apples.push({ x, y, phase: Math.random() * Math.PI * 2 });
+      }
+
+      function pointAtDistance(back) {
+        const target = snake.distance - back;
+        for (let i = 0; i < snake.trail.length - 1; i++) {
+          const a = snake.trail[i];
+          const b = snake.trail[i + 1];
+          if (a.d <= target && b.d >= target) {
+            const t = (target - a.d) / Math.max(0.001, b.d - a.d);
+            return {
+              x: a.x + (b.x - a.x) * t,
+              y: a.y + (b.y - a.y) * t
+            };
+          }
+        }
+        return snake.trail[snake.trail.length - 1];
+      }
+
+      function update(dt) {
+        const horiz = (keys.arrowright || keys.d ? 1 : 0) - (keys.arrowleft || keys.a ? 1 : 0);
+        const vert = (keys.arrowdown || keys.s ? 1 : 0) - (keys.arrowup || keys.w ? 1 : 0);
+
+        if (horiz || vert) {
+          targetHeading = Math.atan2(vert, horiz);
+        } else {
+          const dx = pointer.x - width / 2;
+          const dy = pointer.y - height / 2;
+          if (Math.hypot(dx, dy) > 10) {
+            targetHeading = Math.atan2(dy, dx);
+          }
+        }
+
+        const turnRate = 4.5;
+        heading += clamp(angleDiff(heading, targetHeading), -turnRate * dt, turnRate * dt);
+
+        const speed = 165 + Math.min(score, 35) * 1.4;
+        const ox = snake.x;
+        const oy = snake.y;
+
+        snake.x += Math.cos(heading) * speed * dt;
+        snake.y += Math.sin(heading) * speed * dt;
+        snake.distance += Math.hypot(snake.x - ox, snake.y - oy);
+
+        snake.trail.unshift({ x: snake.x, y: snake.y, d: snake.distance });
+
+        while (snake.trail.length > 160 && snake.distance - snake.trail[snake.trail.length - 1].d > snake.length + 80) {
+          snake.trail.pop();
+        }
+
+        if (snake.x < snake.radius || snake.y < snake.radius || snake.x > WORLD.w - snake.radius || snake.y > WORLD.h - snake.radius) {
+          return endGame();
+        }
+
+        for (let i = apples.length - 1; i >= 0; i--) {
+          const apple = apples[i];
+          if (Math.hypot(apple.x - snake.x, apple.y - snake.y) < snake.radius + APPLE_R + 4) {
+            apples.splice(i, 1);
+            spawnApple();
+            score += 1;
+            snake.length += 12;
+            scoreEl.textContent = String(score);
+          }
+        }
+
+        for (let back = 20; back < snake.length; back += 10) {
+          const p = pointAtDistance(back);
+          if (Math.hypot(p.x - snake.x, p.y - snake.y) < snake.radius * 1.35) {
+            return endGame();
+          }
+        }
+      }
+
+      function drawApple(apple, time, camX, camY) {
+        const x = apple.x - camX;
+        const y = apple.y - camY + Math.sin(time * 0.003 + apple.phase) * 2.4;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.shadowColor = '#ff5d6f';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = '#ff6470';
+        ctx.beginPath();
+        ctx.arc(0, 3, APPLE_R, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffb0aa';
+        ctx.beginPath();
+        ctx.ellipse(-2.5, -1, 2.2, 3.5, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#8fe9a0';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(1, -8);
+        ctx.quadraticCurveTo(3, -14, 8, -13);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawSnake(camX, camY, time) {
+        const points = [];
+        for (let i = 0; i < 80; i++) {
+          const p = pointAtDistance(i * 6);
+          points.push({ x: p.x - camX, y: p.y - camY });
+        }
+
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const body = points.map((p, i) => {
+          const wave = Math.sin((i * 0.35) - time * 0.008) * 1.4;
+          const nx = p.x + wave * 0.5;
+          const ny = p.y + wave * 0.8;
+          return { x: nx, y: ny };
+        });
+
+        ctx.beginPath();
+        body.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.strokeStyle = '#147c58';
+        ctx.lineWidth = 24;
+        ctx.stroke();
+
+        ctx.beginPath();
+        body.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.strokeStyle = '#42d996';
+        ctx.lineWidth = 18;
+        ctx.stroke();
+
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        body.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.strokeStyle = '#d9ffe9';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        const hx = snake.x - camX;
+        const hy = snake.y - camY;
+
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.rotate(heading);
+        ctx.fillStyle = '#5fe7a6';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, snake.radius + 2, snake.radius + 1, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (const side of [-1, 1]) {
+          const eyeX = 5 + side * 4;
+          const eyeY = -3 + side * 1;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(eyeX, eyeY, 2.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#173625';
+          ctx.beginPath();
+          ctx.arc(eyeX + 0.8, eyeY + 0.4, 1.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      function draw(time) {
+        const camX = clamp(snake.x - width / 2, 0, WORLD.w - width);
+        const camY = clamp(snake.y - height / 2, 0, WORLD.h - height);
+
+        ctx.clearRect(0, 0, width, height);
+
+        const bg = ctx.createLinearGradient(0, 0, width, height);
+        bg.addColorStop(0, '#13263f');
+        bg.addColorStop(1, '#0f1d2f');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = 'rgba(192, 216, 255, 0.08)';
+        const step = 36;
+        for (let y = (-camY % step) - step; y < height + step; y += step) {
+          for (let x = (-camX % step) - step; x < width + step; x += step) {
+            ctx.beginPath();
+            ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        ctx.strokeStyle = 'rgba(123, 182, 255, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-camX, -camY, WORLD.w, WORLD.h);
+
+        for (const apple of apples) {
+          drawApple(apple, time, camX, camY);
+        }
+
+        drawSnake(camX, camY, time);
+      }
+
+      function frame(time) {
+        const dt = Math.min((time - lastTime) / 1000 || 0, 0.04);
+        lastTime = time;
+
+        if (running) {
+          update(dt);
+        }
+
+        draw(time);
+        requestAnimationFrame(frame);
+      }
+
+      function startGame() {
+        resetGame();
+        running = true;
+        overlay.classList.add('hidden');
+        lastTime = performance.now();
+        pointer = { x: width / 2, y: height / 2 - 140 };
+      }
+
+      function endGame() {
+        if (!running) return;
+        running = false;
+
+        if (score > best) {
+          best = score;
+          try { localStorage.setItem('slither-best', String(best)); } catch (e) {}
+          bestEl.textContent = String(best);
+        }
+
+        titleEl.textContent = 'Snake bumped!';
+        messageEl.textContent = `You ate ${score} ${score === 1 ? 'apple' : 'apples'}. Want another round?`;
+        startButton.textContent = 'Play again';
+        overlay.classList.remove('hidden');
+      }
+
+      startButton.addEventListener('click', startGame);
+      canvas.addEventListener('pointermove', (e) => {
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+      });
+      canvas.addEventListener('pointerdown', (e) => {
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+      });
+
+      window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) e.preventDefault();
+        keys[key] = true;
+        if (!running && (key === 'enter' || key === ' ')) startGame();
+      });
+      window.addEventListener('keyup', (e) => {
+        keys[e.key.toLowerCase()] = false;
+      });
+
+      resetGame();
+      requestAnimationFrame(frame);
+    })();
+  </script>
 </body>
 </html>
